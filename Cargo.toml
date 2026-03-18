@@ -1,0 +1,16 @@
+[package]
+name = "satis-switcher"
+version = "0.1.0"
+edition = "2021"
+description = "CLI tool for Satisfactory players to switch between stable/experimental Steam branches"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+thiserror = "1"
+chrono = { version = "0.4", features = ["serde"] }
+colored = "2"
+sysinfo = "0.30"
+dirs = "5"
