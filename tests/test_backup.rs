@@ -1,6 +1,7 @@
-use ficswitch::core::{backup, steam::Branch};
+use ficswitch::commands::profile as profile_cmd;
+use ficswitch::core::{backup, profiles, steam, steam::Branch};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn test_save_dir(test_name: &str) -> PathBuf {
     let dir = std::env::temp_dir()
@@ -89,4 +90,82 @@ fn test_backup_restore() {
 
     let _ = fs::remove_dir_all(&save_dir);
     let _ = fs::remove_dir_all(&restore_dir);
+}
+
+// --- ACF trailing newline regression tests ---
+
+const SAMPLE_ACF_WITH_NEWLINE: &str = "\"AppState\"\n{\n\t\"appid\"\t\t\"526870\"\n\t\"UserConfig\"\n\t{\n\t\t\"betakey\"\t\t\"experimental\"\n\t}\n\t\"MountedConfig\"\n\t{\n\t\t\"betakey\"\t\t\"experimental\"\n\t}\n}\n";
+const SAMPLE_ACF_WITHOUT_NEWLINE: &str = "\"AppState\"\n{\n\t\"appid\"\t\t\"526870\"\n\t\"UserConfig\"\n\t{\n\t\t\"betakey\"\t\t\"experimental\"\n\t}\n\t\"MountedConfig\"\n\t{\n\t\t\"betakey\"\t\t\"experimental\"\n\t}\n}";
+
+fn write_temp_acf(dir: &Path, filename: &str, content: &str) -> PathBuf {
+    let path = dir.join(filename);
+    fs::write(&path, content).expect("failed to write temp ACF");
+    path
+}
+
+#[test]
+fn test_acf_trailing_newline_preserved() {
+    let dir = std::env::temp_dir().join("ficswitch_test_acf_newline");
+    fs::create_dir_all(&dir).unwrap();
+
+    let path = write_temp_acf(&dir, "appmanifest_526870.acf", SAMPLE_ACF_WITH_NEWLINE);
+    steam::switch_branch(&path, &steam::Branch::Stable).expect("switch_branch failed");
+
+    let result = fs::read_to_string(&path).expect("failed to read result");
+    assert!(
+        result.ends_with('\n'),
+        "Expected trailing newline to be preserved; last 10 chars: {:?}",
+        &result[result.len().saturating_sub(10)..]
+    );
+
+    fs::remove_file(&path).ok();
+    fs::remove_dir(&dir).ok();
+}
+
+#[test]
+fn test_acf_no_trailing_newline_not_added() {
+    let dir = std::env::temp_dir().join("ficswitch_test_acf_no_newline");
+    fs::create_dir_all(&dir).unwrap();
+
+    let path = write_temp_acf(&dir, "appmanifest_526870.acf", SAMPLE_ACF_WITHOUT_NEWLINE);
+    steam::switch_branch(&path, &steam::Branch::Stable).expect("switch_branch failed");
+
+    let result = fs::read_to_string(&path).expect("failed to read result");
+    assert!(
+        !result.ends_with('\n'),
+        "Expected no trailing newline; last 10 chars: {:?}",
+        &result[result.len().saturating_sub(10)..]
+    );
+
+    fs::remove_file(&path).ok();
+    fs::remove_dir(&dir).ok();
+}
+
+// --- Profile link ERR-03 regression test ---
+
+/// When SMM is not installed (no profiles.json or it is empty), profile link
+/// must return Ok(()) instead of propagating the error (satisfies ERR-03).
+/// Skips automatically if SMM is installed or profiles.json fails to parse.
+#[test]
+fn test_profile_link_no_smm() {
+    match profiles::read_smm_profiles() {
+        Err(_) => {
+            // Parse error means SMM is installed but in an unexpected format.
+            // This machine has SMM; cannot test the no-SMM path here.
+            eprintln!("Skipping test_profile_link_no_smm: SMM config parse error (SMM installed)");
+            return;
+        }
+        Ok(smm) if !smm.profiles.is_empty() => {
+            eprintln!("Skipping test_profile_link_no_smm: SMM profiles present on this system");
+            return;
+        }
+        Ok(_) => {}
+    }
+
+    let result = profile_cmd::link("nonexistent-profile", "stable");
+    assert!(
+        result.is_ok(),
+        "Expected Ok(()) when SMM has no profiles, got Err: {:?}",
+        result.err()
+    );
 }

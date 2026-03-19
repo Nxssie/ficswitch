@@ -33,14 +33,30 @@ pub fn list() -> Result<()> {
 pub fn link(profile_name: &str, branch_name: &str) -> Result<()> {
     let branch = steam::Branch::from_str(branch_name)?;
 
-    profiles::link_profile(profile_name, &branch)?;
-
-    println!(
-        "{} Linked profile '{}' to {} branch",
-        "✓".green(),
-        profile_name.cyan(),
-        branch.to_string().bold()
-    );
+    match profiles::link_profile(profile_name, &branch) {
+        Ok(()) => {
+            println!(
+                "{} Linked profile '{}' to {} branch",
+                "✓".green(),
+                profile_name.cyan(),
+                branch.to_string().bold()
+            );
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("Available profiles:") {
+                let smm = profiles::read_smm_profiles().unwrap_or_default();
+                if smm.profiles.is_empty() {
+                    println!(
+                        "{} SMM has no profiles. Install Satisfactory Mod Manager and create a profile first.",
+                        "!".yellow()
+                    );
+                    return Ok(());
+                }
+            }
+            return Err(e);
+        }
+    }
 
     Ok(())
 }

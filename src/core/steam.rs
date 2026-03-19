@@ -336,4 +336,33 @@ mod tests {
         assert!(result.contains("\"betakey\"\t\t\"\""));
         assert!(!result.contains("\"betakey\"\t\t\"experimental\""));
     }
+
+    #[test]
+    fn test_acf_trailing_newline_preserved() {
+        // Regression: if the original ACF ends with '\n', the output must too.
+        let acf_with_newline = format!("{}\n", SAMPLE_ACF);
+        let result = set_betakey_in_acf(&acf_with_newline, "");
+        assert!(
+            result.ends_with('\n'),
+            "Expected trailing newline to be preserved, but result ends with: {:?}",
+            result.chars().last()
+        );
+    }
+
+    #[test]
+    fn test_acf_no_trailing_newline_not_added() {
+        // Regression: if the original ACF has no trailing '\n', the output must not add one.
+        // SAMPLE_ACF ends with `}"#` — no trailing newline.
+        assert!(
+            !SAMPLE_ACF.ends_with('\n'),
+            "SAMPLE_ACF should not end with newline"
+        );
+        let result = set_betakey_in_acf(SAMPLE_ACF, "");
+        assert!(
+            !result.ends_with('\n'),
+            "Expected no trailing newline to be added, but result ends with '\\n'. \
+             Last 10 chars: {:?}",
+            &result[result.len().saturating_sub(10)..]
+        );
+    }
 }

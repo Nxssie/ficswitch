@@ -122,34 +122,6 @@ pub fn list_saves(save_dir: &Path) -> Result<Vec<PathBuf>> {
     Ok(saves)
 }
 
-/// List all blueprint files (.sbp and .sbpcfg) in the save directory.
-pub fn list_blueprints(save_dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut blueprints = Vec::new();
-    let blueprint_dir = save_dir.join("blueprints");
-
-    if !blueprint_dir.exists() {
-        return Ok(blueprints);
-    }
-
-    fn collect_blueprints(dir: &Path, results: &mut Vec<PathBuf>) -> Result<()> {
-        for entry in fs::read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                collect_blueprints(&path, results)?;
-            } else if let Some(ext) = path.extension() {
-                if ext == "sbp" || ext == "sbpcfg" {
-                    results.push(path);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    collect_blueprints(&blueprint_dir, &mut blueprints)?;
-    blueprints.sort();
-    Ok(blueprints)
-}
 
 #[cfg(test)]
 mod tests {
