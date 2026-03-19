@@ -146,7 +146,7 @@ ficswitch profile list                  # list available SMM profiles
 ## Platform
 
 Linux (Steam/Proton). Paths are resolved automatically for the standard Steam layout.
-Windows support is not planned.
+Windows support is planned for a future release.
 
 ---
 
