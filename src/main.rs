@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
-    name = "satis-switcher",
+    name = "ficswitch",
     about = "CLI tool for switching Satisfactory between stable/experimental Steam branches",
     version
 )]

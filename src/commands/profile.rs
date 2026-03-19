@@ -55,7 +55,7 @@ pub fn show() -> Result<()> {
         );
         println!(
             "Use {} to link a profile to a branch.",
-            "satis-switcher profile link <name> <branch>".dimmed()
+            "ficswitch profile link <name> <branch>".dimmed()
         );
         return Ok(());
     }

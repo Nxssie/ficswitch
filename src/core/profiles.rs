@@ -55,16 +55,16 @@ pub fn smm_config_dir() -> Result<PathBuf> {
     }
 }
 
-/// Get the satis-switcher config directory.
+/// Get the ficswitch config directory.
 pub fn switcher_config_dir() -> Result<PathBuf> {
     let dir = if cfg!(target_os = "windows") {
         dirs::data_local_dir()
             .ok_or_else(|| anyhow!("Cannot determine local app data directory"))?
-            .join("satis-switcher")
+            .join("ficswitch")
     } else {
         dirs::data_dir()
             .ok_or_else(|| anyhow!("Cannot determine data directory"))?
-            .join("satis-switcher")
+            .join("ficswitch")
     };
     Ok(dir)
 }

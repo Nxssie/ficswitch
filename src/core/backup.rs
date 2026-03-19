@@ -22,11 +22,11 @@ pub fn backup_root() -> Result<PathBuf> {
     let data_dir = if cfg!(target_os = "windows") {
         dirs::data_local_dir()
             .ok_or_else(|| anyhow!("Cannot determine local app data directory"))?
-            .join("satis-switcher")
+            .join("ficswitch")
     } else {
         dirs::data_dir()
             .ok_or_else(|| anyhow!("Cannot determine data directory"))?
-            .join("satis-switcher")
+            .join("ficswitch")
     };
 
     Ok(data_dir.join("backups"))
