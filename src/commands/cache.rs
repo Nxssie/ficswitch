@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 
-use crate::core::{branch_cache, steam};
+use crate::core::{branch_cache, mod_deploy, steam};
 
 pub fn create() -> Result<()> {
     let manifest = steam::find_manifest()?;
@@ -19,6 +19,36 @@ pub fn create() -> Result<()> {
             "A download or update is pending for this branch. \
              Let Steam finish the download, then close Steam and run cache create again."
         ));
+    }
+
+    // Deploy SMM mods for this branch before caching so they are included.
+    match mod_deploy::deploy_mods(&game_dir, &branch) {
+        Ok(result) => {
+            if result.sml_deployed || !result.mods_deployed.is_empty() {
+                if result.sml_deployed {
+                    println!("{} SML deployed", "✓".green());
+                }
+                for name in &result.mods_deployed {
+                    println!("{} Mod deployed: {}", "✓".green(), name.cyan());
+                }
+            }
+            if !result.mods_missing.is_empty() {
+                for name in &result.mods_missing {
+                    println!(
+                        "{} Mod zip not found in SMM cache, skipping: {}",
+                        "⚠".yellow(),
+                        name
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            println!(
+                "{} Could not deploy mods ({}), caching without mods",
+                "⚠".yellow(),
+                e
+            );
+        }
     }
 
     println!(
