@@ -1,6 +1,11 @@
 # ficswitch
 
-A CLI tool for Satisfactory players who run both stable and experimental branches.
+> A CLI tool for Satisfactory players who run both stable and experimental branches.
+
+[![Release](https://img.shields.io/github/v/release/Nxssie/ficswitch?style=flat-square&color=orange)](https://github.com/Nxssie/ficswitch/releases/latest)
+[![Built with Rust](https://img.shields.io/badge/built%20with-Rust-b7410e?style=flat-square&logo=rust)](https://www.rust-lang.org)
+[![Platform](https://img.shields.io/badge/platform-Linux-blue?style=flat-square&logo=linux)](https://github.com/Nxssie/ficswitch/releases/latest)
+
 Switches branches instantly from the terminal — no Steam re-downloads, saves backed up automatically, mods in sync.
 
 ---
@@ -25,25 +30,47 @@ The first cache creation is slow (Steam download + hardlink pass). Every switch 
 
 Before caching, it also deploys your SMM mods from the local download cache into the game directory, so mods are included in the snapshot and don't need to be re-fetched.
 
+```
+ficswitch switch stable
+
+→ Switching from experimental to stable
+✓ Saves synced to profile 'experimental' (15 files)
+📦 Creating backup of saves...
+✓ Backup created: 20260319_130118 (15 saves)
+⚙ Restoring stable from cache...
+✓ Restored 1182 files from cache
+✓ SMM profile activated: stable
+
+✓ Done! Launch Satisfactory directly — no Steam download needed.
+```
+
 ---
 
 ## Features
 
-- **Instant branch switching** — hardlink restore instead of Steam download
-- **Automatic save backups** before every switch
-- **SMM profile integration** — each branch maps to its own mod profile
-- **Mod deployment** — extracts SML + mods from the SMM download cache before caching
-- **Cache management** — create, inspect, and clear per-branch caches
+| | |
+|---|---|
+| **Instant branch switching** | Hardlink restore instead of Steam download |
+| **Automatic save backups** | Snapshot before every switch |
+| **SMM profile integration** | Each branch maps to its own mod profile |
+| **Mod deployment** | Extracts SML + mods from the SMM download cache before caching |
+| **Cache management** | Create, inspect, and clear per-branch caches |
 
 ---
 
 ## Installation
 
+### Prebuilt binary
+
+Download the latest binary from [Releases](https://github.com/Nxssie/ficswitch/releases/latest) and place it somewhere in your `$PATH`.
+
+### From source
+
 Requires Rust 2021+.
 
 ```sh
-git clone https://github.com/nxssie/ficswitcher
-cd ficswitcher
+git clone https://github.com/Nxssie/ficswitch
+cd ficswitch
 cargo install --path .
 ```
 
@@ -62,60 +89,56 @@ Commands:
   cache    Manage local branch game file cache
 ```
 
-### Typical workflow
-
-**First time setup — cache both branches:**
+### First time setup
 
 ```sh
-# On stable
+# 1. Link your SMM profiles to each branch
+ficswitch profile link stable my-stable-mods
+ficswitch profile link experimental experimental-mods
+
+# 2. Cache the current branch's game files
 ficswitch cache create
 
-# Switch to experimental (Steam downloads it), then cache it too
+# 3. Switch to the other branch — Steam downloads it the first time
 ficswitch switch experimental
+
+# 4. Cache it too
 ficswitch cache create
 ```
 
-**Day-to-day switching:**
+From now on, every switch is instant.
+
+### Day-to-day
 
 ```sh
-ficswitch switch stable
-# → backup created, 1183 files restored from cache, SMM profile activated
-# → launch Satisfactory directly, no Steam download needed
+ficswitch switch stable       # instant, no download needed
+ficswitch switch experimental # instant, no download needed
+ficswitch status              # show current state
+ficswitch cache status        # show cached branches
+ficswitch backup list         # list all save backups
 ```
 
-**Check what's going on:**
+### Reference
 
+**Cache**
 ```sh
-ficswitch status
-ficswitch cache status
-ficswitch backup list
+ficswitch cache create          # cache the current branch's game files
+ficswitch cache status          # show cached branches and file counts
+ficswitch cache clear <branch>  # clear cache for a branch
 ```
 
-### Branch cache
-
+**Backups**
 ```sh
-ficswitch cache create   # Cache the current branch's game files
-ficswitch cache status   # Show cached branches and file counts
-ficswitch cache clear    # Clear the cache for a branch
+ficswitch backup create                 # create a manual backup
+ficswitch backup list                   # list all backups
+ficswitch backup restore <id>           # restore a backup by ID
 ```
 
-### Save backups
-
-Backups are created automatically on every switch. You can also manage them manually:
-
+**Profiles**
 ```sh
-ficswitch backup create
-ficswitch backup list
-ficswitch backup restore <id>
-```
-
-### SMM profile mapping
-
-ficswitch maps each branch to an SMM profile. When you switch branches, the matching profile is activated automatically.
-
-```sh
-ficswitch profile set stable my-stable-mods
-ficswitch profile set experimental experimental-mods
+ficswitch profile link <name> <branch>  # link an SMM profile to a branch
+ficswitch profile show                  # show current mappings
+ficswitch profile list                  # list available SMM profiles
 ```
 
 ---
@@ -123,6 +146,7 @@ ficswitch profile set experimental experimental-mods
 ## Platform
 
 Linux (Steam/Proton). Paths are resolved automatically for the standard Steam layout.
+Windows support is not planned.
 
 ---
 
