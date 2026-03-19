@@ -171,6 +171,34 @@ pub fn find_manifest() -> Result<PathBuf> {
     ))
 }
 
+/// Check if the appmanifest indicates a pending download or update.
+pub fn is_download_pending(manifest_path: &Path) -> Result<bool> {
+    let content = fs::read_to_string(manifest_path)?;
+    let vdf = parse_vdf_flat(&content);
+
+    // BytesToDownload > 0 and not equal to BytesDownloaded means download in progress.
+    let to_download: u64 = vdf
+        .get("appstate.bytestodownload")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let downloaded: u64 = vdf
+        .get("appstate.bytesdownloaded")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+
+    // TargetBuildID != buildid means Steam has queued an update to a different build.
+    let build_id: u64 = vdf
+        .get("appstate.buildid")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let target_build: u64 = vdf
+        .get("appstate.targetbuildid")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+
+    Ok((target_build != 0 && target_build != build_id) || (to_download > 0 && downloaded < to_download))
+}
+
 /// Check if Steam is currently running.
 pub fn is_steam_running() -> bool {
     let sys = System::new_all();
