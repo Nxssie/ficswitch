@@ -17,12 +17,20 @@ pub struct ModEntry {
 /// Represents a single SMM profile entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SmmProfile {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_default")]
     pub mods: HashMap<String, ModEntry>,
     #[serde(default)]
     pub name: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub required_targets: Vec<String>,
+}
+
+fn deserialize_null_as_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Default + serde::Deserialize<'de>,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
 }
 
 /// Represents the SMM profiles.json structure.
