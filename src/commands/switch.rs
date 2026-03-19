@@ -21,7 +21,7 @@ fn sync_out(save_dir: &std::path::Path, branch: &steam::Branch) {
 }
 
 
-pub fn run(target: &str, no_backup: bool) -> Result<()> {
+pub fn run(target: &str, no_backup: bool, backend: &str, username: Option<&str>) -> Result<()> {
     let target_branch = steam::Branch::from_str(target)?;
 
     // Find manifest
@@ -120,6 +120,37 @@ pub fn run(target: &str, no_backup: bool) -> Result<()> {
         }
         _ => {
             steam::switch_branch(&manifest_path, &target_branch)?;
+
+            if backend == "steamcmd" {
+                let user = username.ok_or_else(|| {
+                    anyhow!("--username <steam_user> is required with --backend steamcmd")
+                })?;
+                let install_dir = steam::get_install_dir(&manifest_path)?;
+                println!(
+                    "{} Downloading {} via SteamCMD...",
+                    "⬇".cyan(),
+                    target_branch.to_string().bold()
+                );
+                steam::download_with_steamcmd(&target_branch, user, &install_dir)?;
+                // Deploy mods and cache
+                if let Ok(result) = mod_deploy::deploy_mods(&install_dir, &target_branch) {
+                    if result.sml_deployed {
+                        println!("{} SML deployed", "✓".green());
+                    }
+                    for name in &result.mods_deployed {
+                        println!("{} Mod deployed: {}", "✓".green(), name.cyan());
+                    }
+                }
+                println!("Caching {} branch game files...", target_branch.to_string().bold());
+                match branch_cache::cache_branch(&install_dir, &manifest_path, &target_branch) {
+                    Ok(count) => println!(
+                        "{} Cached {} branch: {} files hardlinked",
+                        "✓".green(), target_branch, count
+                    ),
+                    Err(e) => println!("{} Cache failed: {}", "⚠".yellow(), e),
+                }
+                return Ok(());
+            }
 
             println!(
                 "{} Launching Steam to download {}...",

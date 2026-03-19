@@ -28,6 +28,14 @@ enum Commands {
         /// Skip automatic backup before switching
         #[arg(long)]
         no_backup: bool,
+
+        /// Download backend when cache is missing: steam (default) or steamcmd
+        #[arg(long, default_value = "steam")]
+        backend: String,
+
+        /// Steam username for SteamCMD (required with --backend steamcmd)
+        #[arg(long)]
+        username: Option<String>,
     },
 
     /// Manage save backups
@@ -106,7 +114,9 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Status => commands::status::run(),
-        Commands::Switch { branch, no_backup } => commands::switch::run(&branch, no_backup),
+        Commands::Switch { branch, no_backup, backend, username } => {
+            commands::switch::run(&branch, no_backup, &backend, username.as_deref())
+        }
         Commands::Backup { action } => match action {
             BackupAction::Create { label } => {
                 commands::backup::create(label.as_deref())

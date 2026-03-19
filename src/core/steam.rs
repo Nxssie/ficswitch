@@ -199,6 +199,89 @@ pub fn is_download_pending(manifest_path: &Path) -> Result<bool> {
     Ok((target_build != 0 && target_build != build_id) || (to_download > 0 && downloaded < to_download))
 }
 
+/// Find the SteamCMD executable.
+pub fn find_steamcmd() -> Result<std::path::PathBuf> {
+    // Check PATH first
+    if let Ok(path) = which_steamcmd() {
+        return Ok(path);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let home = dirs::home_dir().ok_or_else(|| anyhow!("Cannot determine home directory"))?;
+        let candidates = [
+            home.join(".local/share/steamcmd/steamcmd.sh"),
+            home.join(".steam/steamcmd/steamcmd.sh"),
+            home.join("Steam/steamcmd/steamcmd.sh"),
+            std::path::PathBuf::from("/usr/games/steamcmd"),
+            std::path::PathBuf::from("/usr/lib/games/steam/steamcmd"),
+        ];
+        for c in &candidates {
+            if c.exists() {
+                return Ok(c.clone());
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let steam_dir = find_steam_dir()?;
+        let candidate = steam_dir.join("steamcmd.exe");
+        if candidate.exists() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(anyhow!(
+        "steamcmd not found. Install it with your package manager (e.g. apt install steamcmd) or download it from https://developer.valvesoftware.com/wiki/SteamCMD"
+    ))
+}
+
+fn which_steamcmd() -> Result<std::path::PathBuf> {
+    let output = std::process::Command::new("which")
+        .arg("steamcmd")
+        .output()?;
+    if output.status.success() {
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !path.is_empty() {
+            return Ok(std::path::PathBuf::from(path));
+        }
+    }
+    Err(anyhow!("not in PATH"))
+}
+
+/// Download (or update) a branch using SteamCMD.
+/// Inherits stdin/stdout so the user can enter credentials interactively.
+/// After the first successful login, SteamCMD caches the session token.
+pub fn download_with_steamcmd(branch: &Branch, username: &str, install_dir: &Path) -> Result<()> {
+    let steamcmd = find_steamcmd()?;
+
+    let mut cmd = std::process::Command::new(&steamcmd);
+    cmd.arg("+force_install_dir").arg(install_dir)
+        .arg("+login").arg(username)
+        .arg("+app_update").arg("526870");
+
+    if let Branch::Experimental = branch {
+        cmd.arg("-beta").arg("experimental");
+    }
+
+    cmd.arg("validate").arg("+quit");
+
+    let status = cmd.status().context("Failed to run steamcmd")?;
+
+    if !status.success() {
+        return Err(anyhow!("steamcmd exited with an error (code: {})", status));
+    }
+
+    // SteamCMD sometimes creates a steamapps/ subfolder and an appmanifest.acf
+    // inside the install dir when force_install_dir is not applied correctly.
+    // Clean them up so they don't end up in the cache.
+    let _ = fs::remove_dir_all(install_dir.join("steamapps"));
+    let _ = fs::remove_file(install_dir.join("appmanifest.acf"));
+
+    Ok(())
+}
+
 /// Launch the Steam client.
 pub fn launch_steam() -> Result<()> {
     #[cfg(target_os = "windows")]
