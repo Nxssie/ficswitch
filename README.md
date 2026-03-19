@@ -55,6 +55,8 @@ ficswitch switch stable
 | **SMM profile integration** | Each branch maps to its own mod profile |
 | **Mod deployment** | Extracts SML + mods from the SMM download cache before caching |
 | **Cache management** | Create, inspect, and clear per-branch caches |
+| **Auto Steam launch** | Launches Steam automatically when cache is missing, monitors download progress, then caches on close |
+| **SteamCMD backend** | Optional headless download via SteamCMD — no GUI required |
 
 ---
 
@@ -99,10 +101,15 @@ ficswitch profile link experimental experimental-mods
 # 2. Cache the current branch's game files
 ficswitch cache create
 
-# 3. Switch to the other branch — Steam downloads it the first time
+# 3. Switch to the other branch
+#    - If the cache is missing, ficswitch launches Steam automatically,
+#      monitors the download, and caches the branch when Steam closes.
+#    - Or use SteamCMD for a headless download (no GUI):
 ficswitch switch experimental
+ficswitch switch experimental --backend steamcmd --username <steam_user>
 
-# 4. Cache it too
+# 4. If you used the Steam GUI path, the cache is created automatically.
+#    If not, run it manually:
 ficswitch cache create
 ```
 
@@ -119,6 +126,15 @@ ficswitch backup list         # list all save backups
 ```
 
 ### Reference
+
+**Switch**
+```sh
+ficswitch switch <branch>                                        # switch branch (restores from cache or launches Steam)
+ficswitch switch <branch> --no-backup                           # skip automatic save backup
+ficswitch switch <branch> --backend steamcmd --username <user>  # headless download via SteamCMD
+```
+
+> **SteamCMD auth**: the first run prompts for password and Steam Guard interactively. After that the session is cached and subsequent runs are unattended.
 
 **Cache**
 ```sh
