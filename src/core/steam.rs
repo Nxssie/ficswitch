@@ -67,14 +67,14 @@ pub fn parse_vdf_flat(content: &str) -> HashMap<String, String> {
 
         if tokens.len() == 2 {
             let full_key = if section_stack.is_empty() {
-                tokens[0].clone()
+                tokens[0].to_lowercase()
             } else {
-                format!("{}.{}", section_stack.join("."), tokens[0])
+                format!("{}.{}", section_stack.join("."), tokens[0].to_lowercase())
             };
             map.insert(full_key, tokens[1].clone());
         } else if tokens.len() == 1 {
             // Section header
-            section_stack.push(tokens[0].clone());
+            section_stack.push(tokens[0].to_lowercase());
         }
     }
 
@@ -89,8 +89,8 @@ pub fn detect_branch(manifest_path: &Path) -> Result<Branch> {
     let vdf = parse_vdf_flat(&content);
 
     let betakey = vdf
-        .get("UserConfig.betakey")
-        .or_else(|| vdf.get("MountedConfig.betakey"))
+        .get("appstate.userconfig.betakey")
+        .or_else(|| vdf.get("appstate.mountedconfig.betakey"))
         .map(|s| s.as_str())
         .unwrap_or("");
 
@@ -241,7 +241,7 @@ fn set_betakey_in_acf(content: &str, betakey: &str) -> String {
             }
         }
 
-        if (in_user_config || in_mounted_config) && trimmed.contains("\"betakey\"") {
+        if (in_user_config || in_mounted_config) && trimmed.to_lowercase().contains("\"betakey\"") {
             // Replace the betakey line
             let indent = &line[..line.len() - trimmed.len()];
             result.push_str(&format!("{}\"betakey\"\t\t\"{}\"\n", indent, betakey));
@@ -274,7 +274,7 @@ pub fn get_install_dir(manifest_path: &Path) -> Result<PathBuf> {
     let vdf = parse_vdf_flat(&content);
 
     let install_dir = vdf
-        .get("installdir")
+        .get("appstate.installdir")
         .ok_or_else(|| anyhow!("installdir not found in manifest"))?;
 
     let steamapps_dir = manifest_path
@@ -307,10 +307,10 @@ mod tests {
     #[test]
     fn test_parse_vdf_flat() {
         let map = parse_vdf_flat(SAMPLE_ACF);
-        assert_eq!(map.get("AppState.appid").unwrap(), "526870");
-        assert_eq!(map.get("AppState.name").unwrap(), "Satisfactory");
+        assert_eq!(map.get("appstate.appid").unwrap(), "526870");
+        assert_eq!(map.get("appstate.name").unwrap(), "Satisfactory");
         assert_eq!(
-            map.get("AppState.UserConfig.betakey").unwrap(),
+            map.get("appstate.userconfig.betakey").unwrap(),
             "experimental"
         );
     }
