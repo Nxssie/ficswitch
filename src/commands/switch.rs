@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 
-use crate::core::{backup, branch_cache, profiles, saves, steam};
+use crate::core::{backup, branch_cache, mod_deploy, profiles, saves, steam};
 
 fn sync_out(save_dir: &std::path::Path, branch: &steam::Branch) {
     match profiles::profile_name_for_branch(branch) {
@@ -119,10 +119,69 @@ pub fn run(target: &str, no_backup: bool) -> Result<()> {
             }
         }
         _ => {
-            println!("{} Modifying appmanifest...", "⚙".cyan());
             steam::switch_branch(&manifest_path, &target_branch)?;
-            println!("{} Branch set to {}", "✓".green(), target_branch.to_string().bold());
-            false
+
+            println!(
+                "{} Launching Steam to download {}...",
+                "⬇".cyan(),
+                target_branch.to_string().bold()
+            );
+
+            match steam::launch_steam() {
+                Ok(()) => {
+                    if let Err(e) = steam::wait_for_download(&manifest_path, &target_branch) {
+                        println!("{} Error monitoring download: {}", "⚠".yellow(), e);
+                        false
+                    } else {
+                        println!(
+                            "{} Download complete. Close Steam and ficswitch will cache automatically.",
+                            "✓".green()
+                        );
+                        steam::wait_for_steam_close();
+
+                        // Deploy mods and cache
+                        match steam::get_install_dir(&manifest_path) {
+                            Ok(install_dir) => {
+                                if let Ok(result) = mod_deploy::deploy_mods(&install_dir, &target_branch) {
+                                    if result.sml_deployed {
+                                        println!("{} SML deployed", "✓".green());
+                                    }
+                                    for name in &result.mods_deployed {
+                                        println!("{} Mod deployed: {}", "✓".green(), name.cyan());
+                                    }
+                                }
+                                println!(
+                                    "Caching {} branch game files...",
+                                    target_branch.to_string().bold()
+                                );
+                                match branch_cache::cache_branch(&install_dir, &manifest_path, &target_branch) {
+                                    Ok(count) => println!(
+                                        "{} Cached {} branch: {} files hardlinked",
+                                        "✓".green(),
+                                        target_branch,
+                                        count
+                                    ),
+                                    Err(e) => println!("{} Cache failed: {}", "⚠".yellow(), e),
+                                }
+                                true
+                            }
+                            Err(e) => {
+                                println!("{} Could not determine install dir: {}", "⚠".yellow(), e);
+                                false
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!(
+                        "{} Could not launch Steam ({}). Open Steam manually to download {}.",
+                        "⚠".yellow(),
+                        e,
+                        target_branch.to_string().bold()
+                    );
+                    false
+                }
+            }
         }
     };
 

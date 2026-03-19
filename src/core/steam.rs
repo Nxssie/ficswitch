@@ -199,6 +199,101 @@ pub fn is_download_pending(manifest_path: &Path) -> Result<bool> {
     Ok((target_build != 0 && target_build != build_id) || (to_download > 0 && downloaded < to_download))
 }
 
+/// Launch the Steam client.
+pub fn launch_steam() -> Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        let steam_dir = find_steam_dir()?;
+        std::process::Command::new(steam_dir.join("steam.exe"))
+            .spawn()
+            .context("Failed to launch Steam")?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::process::Command::new("steam")
+            .spawn()
+            .context("Failed to launch Steam — is it installed and in PATH?")?;
+    }
+    Ok(())
+}
+
+/// Download progress read from the appmanifest.
+pub struct DownloadProgress {
+    pub bytes_downloaded: u64,
+    pub bytes_total: u64,
+}
+
+/// Read current download progress from the appmanifest.
+pub fn get_download_progress(manifest_path: &Path) -> Result<DownloadProgress> {
+    let content = fs::read_to_string(manifest_path)?;
+    let vdf = parse_vdf_flat(&content);
+
+    let bytes_total = vdf
+        .get("appstate.bytestodownload")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0u64);
+    let bytes_downloaded = vdf
+        .get("appstate.bytesdownloaded")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0u64);
+
+    Ok(DownloadProgress { bytes_downloaded, bytes_total })
+}
+
+/// Block until Steam has finished downloading the target branch.
+/// Prints a live progress line using carriage return.
+pub fn wait_for_download(manifest_path: &Path, branch: &Branch) -> Result<()> {
+    use std::io::Write;
+    use std::time::Duration;
+
+    let mut download_started = false;
+
+    loop {
+        let pending = is_download_pending(manifest_path).unwrap_or(true);
+        let progress = get_download_progress(manifest_path)?;
+
+        if progress.bytes_total > 0 {
+            download_started = true;
+        }
+
+        if download_started && !pending {
+            break;
+        }
+
+        if progress.bytes_total > 0 {
+            let pct = (progress.bytes_downloaded * 100) / progress.bytes_total;
+            let filled = (pct / 5) as usize;
+            let bar = format!("[{}{}]", "█".repeat(filled), "░".repeat(20 - filled));
+            let dl_gb = progress.bytes_downloaded as f64 / 1_073_741_824.0;
+            let total_gb = progress.bytes_total as f64 / 1_073_741_824.0;
+            print!(
+                "\r  Downloading {}... {:.1} GB / {:.1} GB {} {}%   ",
+                branch,
+                dl_gb,
+                total_gb,
+                bar,
+                pct
+            );
+        } else {
+            print!("\r  Waiting for Steam to start download...   ");
+        }
+
+        std::io::stdout().flush().ok();
+        std::thread::sleep(Duration::from_secs(2));
+    }
+
+    println!(); // end the progress line
+    Ok(())
+}
+
+/// Block until Steam is no longer running.
+pub fn wait_for_steam_close() {
+    use std::time::Duration;
+    while is_steam_running() {
+        std::thread::sleep(Duration::from_secs(2));
+    }
+}
+
 /// Check if Steam is currently running.
 pub fn is_steam_running() -> bool {
     let sys = System::new_all();
