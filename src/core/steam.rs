@@ -258,6 +258,13 @@ fn set_betakey_in_acf(content: &str, betakey: &str) -> String {
         result.push('\n');
     }
 
+    // Preserve trailing newline exactly as in source
+    if content.ends_with('\n') && !result.ends_with('\n') {
+        result.push('\n');
+    } else if !content.ends_with('\n') && result.ends_with('\n') {
+        result.pop();
+    }
+
     result
 }
 
