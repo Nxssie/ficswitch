@@ -251,11 +251,29 @@ fn which_steamcmd() -> Result<std::path::PathBuf> {
 }
 
 /// Download (or update) a branch using SteamCMD.
-/// Inherits stdin/stdout so the user can enter credentials interactively.
-/// After the first successful login, SteamCMD caches the session token.
+///
+/// Runs in two steps so that +force_install_dir is always honoured:
+///
+/// 1. Login-only pass (`+login <user> +quit`) — inherits stdin for interactive
+///    auth (password + Steam Guard). On success, SteamCMD caches the session.
+/// 2. Update pass (`+force_install_dir <dir> +login <user> +app_update … +quit`)
+///    — the cached session means login completes instantly, so +force_install_dir
+///    is processed before the login token is consumed and is never ignored.
 pub fn download_with_steamcmd(branch: &Branch, username: &str, install_dir: &Path) -> Result<()> {
     let steamcmd = find_steamcmd()?;
 
+    // Step 1: login only (interactive auth, caches the session token).
+    let login_status = std::process::Command::new(&steamcmd)
+        .arg("+login").arg(username)
+        .arg("+quit")
+        .status()
+        .context("Failed to run steamcmd (login step)")?;
+
+    if !login_status.success() {
+        return Err(anyhow!("steamcmd login failed (code: {})", login_status));
+    }
+
+    // Step 2: actual download — session is cached, +force_install_dir takes effect.
     let mut cmd = std::process::Command::new(&steamcmd);
     cmd.arg("+force_install_dir").arg(install_dir)
         .arg("+login").arg(username)
@@ -267,15 +285,14 @@ pub fn download_with_steamcmd(branch: &Branch, username: &str, install_dir: &Pat
 
     cmd.arg("validate").arg("+quit");
 
-    let status = cmd.status().context("Failed to run steamcmd")?;
+    let status = cmd.status().context("Failed to run steamcmd (update step)")?;
 
     if !status.success() {
-        return Err(anyhow!("steamcmd exited with an error (code: {})", status));
+        return Err(anyhow!("steamcmd update failed (code: {})", status));
     }
 
-    // SteamCMD sometimes creates a steamapps/ subfolder and an appmanifest.acf
-    // inside the install dir when force_install_dir is not applied correctly.
-    // Clean them up so they don't end up in the cache.
+    // SteamCMD creates a steamapps/ subfolder with its own appmanifest inside
+    // force_install_dir. Remove them so they don't end up in the branch cache.
     let _ = fs::remove_dir_all(install_dir.join("steamapps"));
     let _ = fs::remove_file(install_dir.join("appmanifest.acf"));
 
