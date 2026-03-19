@@ -3,6 +3,24 @@ use colored::Colorize;
 
 use crate::core::{backup, branch_cache, profiles, saves, steam};
 
+fn sync_out(save_dir: &std::path::Path, branch: &steam::Branch) {
+    match profiles::profile_name_for_branch(branch) {
+        Ok(Some(profile)) => {
+            match saves::sync_saves_out(save_dir, &profile) {
+                Ok(n) => println!(
+                    "{} Saves synced to profile '{}' ({} files)",
+                    "✓".green(),
+                    profile.cyan(),
+                    n
+                ),
+                Err(e) => println!("{} Save sync failed: {}", "⚠".yellow(), e),
+            }
+        }
+        _ => {}
+    }
+}
+
+
 pub fn run(target: &str, no_backup: bool) -> Result<()> {
     let target_branch = steam::Branch::from_str(target)?;
 
@@ -31,6 +49,11 @@ pub fn run(target: &str, no_backup: bool) -> Result<()> {
         return Err(anyhow!(
             "Steam is currently running. Please close Steam before switching branches."
         ));
+    }
+
+    // Sync current profile's saves out before switching
+    if let Ok(save_dir) = saves::find_save_dir() {
+        sync_out(&save_dir, &current_branch);
     }
 
     // Backup saves

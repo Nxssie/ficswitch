@@ -3,6 +3,63 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+fn ficswitch_data_dir() -> Result<PathBuf> {
+    let base = if cfg!(target_os = "windows") {
+        dirs::data_local_dir()
+            .ok_or_else(|| anyhow!("Cannot determine local app data directory"))?
+    } else {
+        dirs::data_dir().ok_or_else(|| anyhow!("Cannot determine data directory"))?
+    };
+    Ok(base.join("ficswitch"))
+}
+
+fn profile_saves_dir(profile_name: &str) -> Result<PathBuf> {
+    Ok(ficswitch_data_dir()?.join("profiles").join(profile_name).join("saves"))
+}
+
+fn profile_blueprints_dir(profile_name: &str) -> Result<PathBuf> {
+    Ok(ficswitch_data_dir()?.join("profiles").join(profile_name).join("blueprints"))
+}
+
+fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
+    fs::create_dir_all(dest)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir(&src_path, &dest_path)?;
+        } else {
+            fs::copy(&src_path, &dest_path)?;
+        }
+    }
+    Ok(())
+}
+
+/// Copy game saves (and blueprints) to the profile store. Returns file count.
+pub fn sync_saves_out(game_save_dir: &Path, profile_name: &str) -> Result<usize> {
+    let dest = profile_saves_dir(profile_name)?;
+    fs::create_dir_all(&dest)?;
+
+    let mut count = 0;
+    for entry in fs::read_dir(game_save_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().map_or(false, |ext| ext == "sav") {
+            fs::copy(&path, dest.join(entry.file_name()))?;
+            count += 1;
+        }
+    }
+
+    let blueprint_src = game_save_dir.join("blueprints");
+    if blueprint_src.exists() {
+        copy_dir(&blueprint_src, &profile_blueprints_dir(profile_name)?)?;
+    }
+
+    Ok(count)
+}
+
+
 const SATISFACTORY_APP_ID: &str = "526870";
 
 #[derive(Debug)]

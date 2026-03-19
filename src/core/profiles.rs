@@ -134,6 +134,12 @@ pub fn write_branch_profiles(profiles: &BranchProfiles) -> Result<()> {
     Ok(())
 }
 
+/// Get the SMM profile name linked to a branch, if any.
+pub fn profile_name_for_branch(branch: &Branch) -> Result<Option<String>> {
+    let branch_profiles = read_branch_profiles()?;
+    Ok(branch_profiles.mappings.get(&branch.to_string()).cloned())
+}
+
 /// Link a SMM profile to a branch.
 pub fn link_profile(profile_name: &str, branch: &Branch) -> Result<()> {
     // Verify profile exists in SMM
