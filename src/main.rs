@@ -41,6 +41,12 @@ enum Commands {
         #[command(subcommand)]
         action: ProfileAction,
     },
+
+    /// Manage local branch game file cache (avoids Steam re-downloads)
+    Cache {
+        #[command(subcommand)]
+        action: CacheAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -80,6 +86,21 @@ enum ProfileAction {
     Show,
 }
 
+#[derive(Subcommand)]
+enum CacheAction {
+    /// Cache the current branch's game files using hardlinks
+    Create,
+
+    /// Show cached branches
+    Status,
+
+    /// Clear the cache for a branch
+    Clear {
+        /// Branch to clear: stable or experimental
+        branch: String,
+    },
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
@@ -97,6 +118,11 @@ fn main() -> anyhow::Result<()> {
             ProfileAction::List => commands::profile::list(),
             ProfileAction::Link { name, branch } => commands::profile::link(&name, &branch),
             ProfileAction::Show => commands::profile::show(),
+        },
+        Commands::Cache { action } => match action {
+            CacheAction::Create => commands::cache::create(),
+            CacheAction::Status => commands::cache::status(),
+            CacheAction::Clear { branch } => commands::cache::clear(&branch),
         },
     }
 }

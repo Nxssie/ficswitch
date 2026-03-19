@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 
-use crate::core::{backup, profiles, saves, steam};
+use crate::core::{backup, branch_cache, profiles, saves, steam};
 
 pub fn run(target: &str, no_backup: bool) -> Result<()> {
     let target_branch = steam::Branch::from_str(target)?;
@@ -70,10 +70,38 @@ pub fn run(target: &str, no_backup: bool) -> Result<()> {
         }
     }
 
-    // Switch branch in manifest
-    println!("{} Modifying appmanifest...", "⚙".cyan());
-    steam::switch_branch(&manifest_path, &target_branch)?;
-    println!("{} Branch set to {}", "✓".green(), target_branch.to_string().bold());
+    // Restore game files and appmanifest from cache if available, otherwise just update betakey
+    let used_cache = match (steam::get_install_dir(&manifest_path), branch_cache::is_cached(&target_branch)) {
+        (Ok(install_dir), Ok(true)) => {
+            println!(
+                "{} Restoring {} from cache...",
+                "⚙".cyan(),
+                target_branch.to_string().bold()
+            );
+            match branch_cache::restore_branch(&install_dir, &manifest_path, &target_branch) {
+                Ok(count) => {
+                    println!("{} Restored {} files from cache", "✓".green(), count);
+                    true
+                }
+                Err(e) => {
+                    println!(
+                        "{} Cache restore failed: {} (falling back to Steam download)",
+                        "⚠".yellow(),
+                        e
+                    );
+                    steam::switch_branch(&manifest_path, &target_branch)?;
+                    println!("{} Branch set to {}", "✓".green(), target_branch.to_string().bold());
+                    false
+                }
+            }
+        }
+        _ => {
+            println!("{} Modifying appmanifest...", "⚙".cyan());
+            steam::switch_branch(&manifest_path, &target_branch)?;
+            println!("{} Branch set to {}", "✓".green(), target_branch.to_string().bold());
+            false
+        }
+    };
 
     // Activate SMM profile
     match steam::get_install_dir(&manifest_path) {
@@ -112,11 +140,18 @@ pub fn run(target: &str, no_backup: bool) -> Result<()> {
     }
 
     println!();
-    println!(
-        "{} Done! Start Steam to download the {} branch delta.",
-        "✓".green().bold(),
-        target_branch.to_string().bold()
-    );
+    if used_cache {
+        println!(
+            "{} Done! Launch Satisfactory directly — no Steam download needed.",
+            "✓".green().bold()
+        );
+    } else {
+        println!(
+            "{} Done! Start Steam to download the {} branch delta.",
+            "✓".green().bold(),
+            target_branch.to_string().bold()
+        );
+    }
 
     Ok(())
 }
