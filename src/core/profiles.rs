@@ -14,25 +14,46 @@ pub struct ModEntry {
     pub enabled: bool,
 }
 
+/// Represents a single SMM profile entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SmmProfile {
+    #[serde(default)]
+    pub mods: HashMap<String, ModEntry>,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub required_targets: Vec<String>,
+}
+
 /// Represents the SMM profiles.json structure.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SmmProfiles {
     #[serde(default)]
-    pub profiles: HashMap<String, HashMap<String, ModEntry>>,
+    pub profiles: HashMap<String, SmmProfile>,
+    #[serde(default)]
+    pub selected_profile: String,
+    #[serde(default)]
+    pub version: i32,
+}
+
+/// Represents a single SMM installation entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstallationConfig {
+    pub path: String,
+    pub profile: String,
+    #[serde(default)]
+    pub vanilla: bool,
 }
 
 /// Represents the SMM installations.json structure.
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SmmInstallations {
     #[serde(default)]
-    pub installations: HashMap<String, InstallationConfig>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InstallationConfig {
-    pub profile: String,
-    #[serde(flatten)]
-    pub extra: HashMap<String, serde_json::Value>,
+    pub installations: Vec<InstallationConfig>,
+    #[serde(default)]
+    pub selected_installation: String,
+    #[serde(default)]
+    pub version: i32,
 }
 
 /// Our branch-to-profile mapping.
@@ -139,16 +160,14 @@ pub fn activate_profile_for_branch(branch: &Branch, install_path: &Path) -> Resu
     let mut installations = read_smm_installations()?;
     let install_key = install_path.to_string_lossy().to_string();
 
-    if let Some(config) = installations.installations.get_mut(&install_key) {
+    if let Some(config) = installations.installations.iter_mut().find(|i| i.path == install_key) {
         config.profile = profile_name.clone();
     } else {
-        installations.installations.insert(
-            install_key,
-            InstallationConfig {
-                profile: profile_name.clone(),
-                extra: HashMap::new(),
-            },
-        );
+        installations.installations.push(InstallationConfig {
+            path: install_key,
+            profile: profile_name.clone(),
+            vanilla: false,
+        });
     }
 
     // Write updated installations

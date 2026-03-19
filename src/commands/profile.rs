@@ -17,12 +17,12 @@ pub fn list() -> Result<()> {
     println!("{}", "=== SMM Profiles ===".bold());
     println!();
 
-    for (name, mods) in &smm_profiles.profiles {
-        let enabled_count = mods.values().filter(|m| m.enabled).count();
+    for (name, profile) in &smm_profiles.profiles {
+        let enabled_count = profile.mods.values().filter(|m| m.enabled).count();
         println!(
             "  {} ({} mods, {} enabled)",
             name.bold(),
-            mods.len(),
+            profile.mods.len(),
             enabled_count
         );
     }
