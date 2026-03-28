@@ -52,6 +52,7 @@ ficswitch switch stable
 |---|---|
 | **Instant branch switching** | Hardlink restore instead of Steam download |
 | **Automatic save backups** | Snapshot before every switch |
+| **Steam Cloud handling** | Warns about conflicts; `--ignore-cloud` to backup during switch |
 | **SMM profile integration** | Each branch maps to its own mod profile |
 | **Mod deployment** | Extracts SML + mods from the SMM download cache before caching |
 | **Cache management** | Create, inspect, and clear per-branch caches |
@@ -131,8 +132,11 @@ ficswitch backup list         # list all save backups
 ```sh
 ficswitch switch <branch>                                        # switch branch (restores from cache or launches Steam)
 ficswitch switch <branch> --no-backup                           # skip automatic save backup
+ficswitch switch <branch> --ignore-cloud                        # temporarily backup Steam Cloud data during switch
 ficswitch switch <branch> --backend steamcmd --username <user>  # headless download via SteamCMD
 ```
+
+> **Steam Cloud**: Satisfactory uses Steam Cloud to sync saves. When switching branches, this can cause conflicts. Use `--ignore-cloud` to temporarily move the Steam Cloud remote directory during the switch, preventing Steam from overwriting your local saves.
 
 > **SteamCMD auth**: the first run prompts for password and Steam Guard interactively. After that the session is cached and subsequent runs are unattended.
 
@@ -150,12 +154,31 @@ ficswitch backup list                   # list all backups
 ficswitch backup restore <id>           # restore a backup by ID
 ```
 
+**Steam Cloud**
+```sh
+ficswitch cloud status                  # show Steam Cloud status
+ficswitch cloud backup                  # backup Steam Cloud data (disables sync)
+ficswitch cloud restore                 # restore Steam Cloud from backup
+ficswitch cloud clear                   # delete backup without restoring
+```
+
+> **Steam Cloud**: Use `ficswitch cloud backup` before switching branches if you want to keep your saves separate. This temporarily disables Steam Cloud sync for Satisfactory.
+
 **Profiles**
 ```sh
 ficswitch profile link <name> <branch>  # link an SMM profile to a branch
 ficswitch profile show                  # show current mappings
 ficswitch profile list                  # list available SMM profiles
 ```
+
+**Dry Run**
+```sh
+ficswitch --dry-run switch experimental     # preview switch operations
+ficswitch --dry-run cloud backup            # preview cloud backup
+ficswitch --dry-run backup restore <id>     # preview backup restore
+```
+
+> **Dry run**: Shows what would happen without making changes. Useful for testing commands before executing them.
 
 ---
 

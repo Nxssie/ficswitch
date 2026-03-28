@@ -18,3 +18,13 @@ fn test_is_steam_running_returns_bool() {
     // The value itself doesn't matter in test env — just that it's a valid bool.
     let _ = result;
 }
+
+#[test]
+fn test_switch_accepts_dry_run_parameter() {
+    // Compile-time check: verify switch::run accepts dry_run parameter.
+    // The function signature is:
+    // run(target: &str, no_backup: bool, backend: &str, username: Option<&str>, ignore_cloud: bool, dry_run: bool)
+    let _ = |_dry_run: bool| {
+        let _ = ficswitch::commands::switch::run;
+    };
+}

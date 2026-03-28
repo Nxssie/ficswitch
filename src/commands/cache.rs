@@ -3,7 +3,7 @@ use colored::Colorize;
 
 use crate::core::{branch_cache, mod_deploy, steam};
 
-pub fn create() -> Result<()> {
+pub fn create(dry_run: bool) -> Result<()> {
     let manifest = steam::find_manifest()?;
     let branch = steam::detect_branch(&manifest)?;
     let game_dir = steam::get_install_dir(&manifest)?;
@@ -19,6 +19,20 @@ pub fn create() -> Result<()> {
             "A download or update is pending for this branch. \
              Let Steam finish the download, then close Steam and run cache create again."
         ));
+    }
+
+    if dry_run {
+        println!("{} [DRY RUN] Would cache {} branch", "ℹ".blue(), branch);
+        println!("  Game dir: {}", game_dir.display());
+        println!("  Manifest: {}", manifest.display());
+
+        let caches = branch_cache::list_caches()?;
+        let current_cached = caches.iter().find(|c| c.branch == branch);
+        if let Some(info) = current_cached {
+            println!("  Existing cache: {} files", info.file_count);
+        }
+
+        return Ok(());
     }
 
     // Deploy SMM mods for this branch before caching so they are included.
@@ -94,8 +108,22 @@ pub fn status() -> Result<()> {
     Ok(())
 }
 
-pub fn clear(branch_name: &str) -> Result<()> {
+pub fn clear(branch_name: &str, dry_run: bool) -> Result<()> {
     let branch = steam::Branch::from_str(branch_name)?;
+
+    if dry_run {
+        println!(
+            "{} [DRY RUN] Would clear cache for {} branch",
+            "ℹ".blue(),
+            branch
+        );
+        let caches = branch_cache::list_caches()?;
+        if let Some(info) = caches.iter().find(|c| c.branch == branch) {
+            println!("  Files to remove: {}", info.file_count);
+        }
+        return Ok(());
+    }
+
     branch_cache::clear_cache(&branch)?;
     println!(
         "{} Cache cleared for {} branch.",

@@ -53,9 +53,8 @@ pub fn create_backup(
 
     for save_file in &save_files {
         if let Some(filename) = save_file.file_name() {
-            fs::copy(save_file, saves_backup_dir.join(filename)).with_context(|| {
-                format!("Failed to copy save file: {}", save_file.display())
-            })?;
+            fs::copy(save_file, saves_backup_dir.join(filename))
+                .with_context(|| format!("Failed to copy save file: {}", save_file.display()))?;
         }
     }
 

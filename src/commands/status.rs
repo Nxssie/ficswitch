@@ -10,11 +10,7 @@ pub fn run() -> Result<()> {
     // Find and show manifest info
     match steam::find_manifest() {
         Ok(manifest_path) => {
-            println!(
-                "{} {}",
-                "Manifest:".bold(),
-                manifest_path.display()
-            );
+            println!("{} {}", "Manifest:".bold(), manifest_path.display());
 
             match steam::detect_branch(&manifest_path) {
                 Ok(branch) => {
@@ -33,11 +29,7 @@ pub fn run() -> Result<()> {
             }
         }
         Err(e) => {
-            println!(
-                "{} {}",
-                "Satisfactory not found:".red().bold(),
-                e
-            );
+            println!("{} {}", "Satisfactory not found:".red().bold(), e);
         }
     }
 
@@ -48,6 +40,34 @@ pub fn run() -> Result<()> {
         println!("{} {}", "Steam:".bold(), "running".yellow());
     } else {
         println!("{} {}", "Steam:".bold(), "not running".green());
+    }
+
+    // Steam Cloud status
+    match steam::is_steam_cloud_active() {
+        true => {
+            let backup_status = if steam::has_cloud_backup() {
+                " (backup exists)".dimmed()
+            } else {
+                "".clear()
+            };
+            println!(
+                "{} {}{}",
+                "Steam Cloud:".bold(),
+                "active".yellow(),
+                backup_status
+            );
+        }
+        false => {
+            if steam::has_cloud_backup() {
+                println!(
+                    "{} {}",
+                    "Steam Cloud:".bold(),
+                    "inactive (backup exists)".dimmed()
+                );
+            } else {
+                println!("{} {}", "Steam Cloud:".bold(), "inactive".green());
+            }
+        }
     }
 
     println!();

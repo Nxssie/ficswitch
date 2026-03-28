@@ -174,7 +174,11 @@ pub fn activate_profile_for_branch(branch: &Branch, install_path: &Path) -> Resu
     let mut installations = read_smm_installations()?;
     let install_key = install_path.to_string_lossy().to_string();
 
-    if let Some(config) = installations.installations.iter_mut().find(|i| i.path == install_key) {
+    if let Some(config) = installations
+        .installations
+        .iter_mut()
+        .find(|i| i.path == install_key)
+    {
         config.profile = profile_name.clone();
     } else {
         installations.installations.push(InstallationConfig {
@@ -199,8 +203,8 @@ fn read_json_file<T: serde::de::DeserializeOwned + Default>(path: &Path) -> Resu
         return Ok(T::default());
     }
 
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read: {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read: {}", path.display()))?;
 
     serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse JSON: {}", path.display()))

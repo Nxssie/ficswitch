@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use sysinfo::System;
 
 const SATISFACTORY_APP_ID: &str = "526870";
+const STEAM_CLOUD_BACKUP_SUFFIX: &str = "ficswitch_backup";
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Branch {
@@ -196,7 +197,8 @@ pub fn is_download_pending(manifest_path: &Path) -> Result<bool> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
 
-    Ok((target_build != 0 && target_build != build_id) || (to_download > 0 && downloaded < to_download))
+    Ok((target_build != 0 && target_build != build_id)
+        || (to_download > 0 && downloaded < to_download))
 }
 
 /// Find the SteamCMD executable.
@@ -264,7 +266,8 @@ pub fn download_with_steamcmd(branch: &Branch, username: &str, install_dir: &Pat
 
     // Step 1: login only (interactive auth, caches the session token).
     let login_status = std::process::Command::new(&steamcmd)
-        .arg("+login").arg(username)
+        .arg("+login")
+        .arg(username)
         .arg("+quit")
         .status()
         .context("Failed to run steamcmd (login step)")?;
@@ -275,9 +278,12 @@ pub fn download_with_steamcmd(branch: &Branch, username: &str, install_dir: &Pat
 
     // Step 2: actual download — session is cached, +force_install_dir takes effect.
     let mut cmd = std::process::Command::new(&steamcmd);
-    cmd.arg("+force_install_dir").arg(install_dir)
-        .arg("+login").arg(username)
-        .arg("+app_update").arg("526870");
+    cmd.arg("+force_install_dir")
+        .arg(install_dir)
+        .arg("+login")
+        .arg(username)
+        .arg("+app_update")
+        .arg("526870");
 
     if let Branch::Experimental = branch {
         cmd.arg("-beta").arg("experimental");
@@ -285,7 +291,9 @@ pub fn download_with_steamcmd(branch: &Branch, username: &str, install_dir: &Pat
 
     cmd.arg("validate").arg("+quit");
 
-    let status = cmd.status().context("Failed to run steamcmd (update step)")?;
+    let status = cmd
+        .status()
+        .context("Failed to run steamcmd (update step)")?;
 
     if !status.success() {
         return Err(anyhow!("steamcmd update failed (code: {})", status));
@@ -337,7 +345,10 @@ pub fn get_download_progress(manifest_path: &Path) -> Result<DownloadProgress> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(0u64);
 
-    Ok(DownloadProgress { bytes_downloaded, bytes_total })
+    Ok(DownloadProgress {
+        bytes_downloaded,
+        bytes_total,
+    })
 }
 
 /// Block until Steam has finished downloading the target branch.
@@ -368,11 +379,7 @@ pub fn wait_for_download(manifest_path: &Path, branch: &Branch) -> Result<()> {
             let total_gb = progress.bytes_total as f64 / 1_073_741_824.0;
             print!(
                 "\r  Downloading {}... {:.1} GB / {:.1} GB {} {}%   ",
-                branch,
-                dl_gb,
-                total_gb,
-                bar,
-                pct
+                branch, dl_gb, total_gb, bar, pct
             );
         } else {
             print!("\r  Waiting for Steam to start download...   ");
@@ -507,6 +514,107 @@ pub fn get_install_dir(manifest_path: &Path) -> Result<PathBuf> {
     Ok(steamapps_dir.join("common").join(install_dir))
 }
 
+/// Find the Steam userdata directory.
+pub fn find_userdata_dir() -> Result<PathBuf> {
+    let steam_dir = find_steam_dir()?;
+    let userdata = steam_dir.join("userdata");
+    if userdata.exists() {
+        return Ok(userdata);
+    }
+    Err(anyhow!("Steam userdata directory not found"))
+}
+
+/// Find the Steam Cloud remote directory for Satisfactory.
+/// Returns the path to userdata/<steam_id>/526870/remote/
+pub fn find_cloud_remote_dir() -> Result<PathBuf> {
+    let userdata_dir = find_userdata_dir()?;
+
+    for entry in fs::read_dir(&userdata_dir)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+
+        if name_str.chars().all(|c| c.is_ascii_digit()) {
+            let remote_dir = entry.path().join(SATISFACTORY_APP_ID).join("remote");
+            if remote_dir.exists() {
+                return Ok(remote_dir);
+            }
+        }
+    }
+
+    Err(anyhow!(
+        "Steam Cloud remote directory not found for Satisfactory"
+    ))
+}
+
+/// Check if Steam Cloud has data for Satisfactory (remote directory exists).
+pub fn is_steam_cloud_active() -> bool {
+    find_cloud_remote_dir().is_ok()
+}
+
+/// Get the backup path for Steam Cloud remote directory.
+pub fn get_cloud_backup_path() -> Result<PathBuf> {
+    let remote_dir = find_cloud_remote_dir()?;
+    Ok(remote_dir.parent().unwrap().join(STEAM_CLOUD_BACKUP_SUFFIX))
+}
+
+/// Rename Steam Cloud remote directory to backup.
+/// This prevents Steam Cloud from interfering with save management.
+pub fn backup_steam_cloud() -> Result<PathBuf> {
+    let remote_dir = find_cloud_remote_dir()?;
+    let backup_path = get_cloud_backup_path()?;
+
+    if backup_path.exists() {
+        fs::remove_dir_all(&backup_path)
+            .with_context(|| format!("Failed to remove old backup: {}", backup_path.display()))?;
+    }
+
+    fs::rename(&remote_dir, &backup_path).with_context(|| {
+        format!(
+            "Failed to rename Steam Cloud remote: {} -> {}",
+            remote_dir.display(),
+            backup_path.display()
+        )
+    })?;
+
+    Ok(backup_path)
+}
+
+/// Restore Steam Cloud remote directory from backup.
+pub fn restore_steam_cloud() -> Result<()> {
+    let backup_path = get_cloud_backup_path()?;
+    let remote_dir = find_cloud_remote_dir()?
+        .parent()
+        .ok_or_else(|| anyhow!("Invalid remote directory path"))?
+        .join("remote");
+
+    if !backup_path.exists() {
+        return Ok(());
+    }
+
+    if remote_dir.exists() {
+        fs::remove_dir_all(&remote_dir).with_context(|| {
+            format!("Failed to remove current remote: {}", remote_dir.display())
+        })?;
+    }
+
+    fs::rename(&backup_path, &remote_dir).with_context(|| {
+        format!(
+            "Failed to restore Steam Cloud backup: {} -> {}",
+            backup_path.display(),
+            remote_dir.display()
+        )
+    })?;
+
+    Ok(())
+}
+
+/// Check if a Steam Cloud backup exists (created by ficswitch).
+#[allow(dead_code)]
+pub fn has_cloud_backup() -> bool {
+    get_cloud_backup_path().map(|p| p.exists()).unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -541,7 +649,10 @@ mod tests {
     #[test]
     fn test_branch_from_str() {
         assert_eq!(Branch::from_str("stable").unwrap(), Branch::Stable);
-        assert_eq!(Branch::from_str("experimental").unwrap(), Branch::Experimental);
+        assert_eq!(
+            Branch::from_str("experimental").unwrap(),
+            Branch::Experimental
+        );
         assert_eq!(Branch::from_str("").unwrap(), Branch::Stable);
         assert_eq!(Branch::from_str("public").unwrap(), Branch::Stable);
         assert!(Branch::from_str("unknown").is_err());
@@ -586,6 +697,32 @@ mod tests {
             "Expected no trailing newline to be added, but result ends with '\\n'. \
              Last 10 chars: {:?}",
             &result[result.len().saturating_sub(10)..]
+        );
+    }
+
+    #[test]
+    fn test_steam_cloud_functions_exist() {
+        // Compile-time check: verify Steam Cloud functions are accessible.
+        let _ = is_steam_cloud_active;
+        let _ = has_cloud_backup;
+        let _ = backup_steam_cloud;
+        let _ = restore_steam_cloud;
+    }
+
+    #[test]
+    fn test_find_cloud_remote_dir_returns_result() {
+        // In test env without Steam, this should return Err.
+        let result = find_cloud_remote_dir();
+        assert!(result.is_err(), "Should fail without Steam installed");
+    }
+
+    #[test]
+    fn test_get_cloud_backup_path_returns_result() {
+        // In test env without Steam, this should return Err since remote dir doesn't exist.
+        let result = get_cloud_backup_path();
+        assert!(
+            result.is_err(),
+            "Should fail without Steam Cloud remote dir"
         );
     }
 }

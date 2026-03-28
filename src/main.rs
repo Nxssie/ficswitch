@@ -11,6 +11,10 @@ use clap::{Parser, Subcommand};
     version
 )]
 struct Cli {
+    /// Show what would be done without making changes
+    #[arg(short, long, global = true)]
+    dry_run: bool,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -36,6 +40,10 @@ enum Commands {
         /// Steam username for SteamCMD (required with --backend steamcmd)
         #[arg(long)]
         username: Option<String>,
+
+        /// Temporarily rename Steam Cloud remote to prevent sync conflicts
+        #[arg(long)]
+        ignore_cloud: bool,
     },
 
     /// Manage save backups
@@ -54,6 +62,12 @@ enum Commands {
     Cache {
         #[command(subcommand)]
         action: CacheAction,
+    },
+
+    /// Manage Steam Cloud data for Satisfactory
+    Cloud {
+        #[command(subcommand)]
+        action: CloudAction,
     },
 }
 
@@ -109,30 +123,64 @@ enum CacheAction {
     },
 }
 
+#[derive(Subcommand)]
+enum CloudAction {
+    /// Show Steam Cloud status for Satisfactory
+    Status,
+
+    /// Backup Steam Cloud data (disables cloud sync temporarily)
+    Backup,
+
+    /// Restore Steam Cloud data from backup
+    Restore,
+
+    /// Delete the Steam Cloud backup without restoring
+    Clear,
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Status => commands::status::run(),
-        Commands::Switch { branch, no_backup, backend, username } => {
-            commands::switch::run(&branch, no_backup, &backend, username.as_deref())
-        }
+        Commands::Switch {
+            branch,
+            no_backup,
+            backend,
+            username,
+            ignore_cloud,
+        } => commands::switch::run(
+            &branch,
+            no_backup,
+            &backend,
+            username.as_deref(),
+            ignore_cloud,
+            cli.dry_run,
+        ),
         Commands::Backup { action } => match action {
             BackupAction::Create { label } => {
-                commands::backup::create(label.as_deref())
+                commands::backup::create(label.as_deref(), cli.dry_run)
             }
             BackupAction::List => commands::backup::list(),
-            BackupAction::Restore { id } => commands::backup::restore(&id),
+            BackupAction::Restore { id } => commands::backup::restore(&id, cli.dry_run),
         },
         Commands::Profile { action } => match action {
             ProfileAction::List => commands::profile::list(),
-            ProfileAction::Link { name, branch } => commands::profile::link(&name, &branch),
+            ProfileAction::Link { name, branch } => {
+                commands::profile::link(&name, &branch, cli.dry_run)
+            }
             ProfileAction::Show => commands::profile::show(),
         },
         Commands::Cache { action } => match action {
-            CacheAction::Create => commands::cache::create(),
+            CacheAction::Create => commands::cache::create(cli.dry_run),
             CacheAction::Status => commands::cache::status(),
-            CacheAction::Clear { branch } => commands::cache::clear(&branch),
+            CacheAction::Clear { branch } => commands::cache::clear(&branch, cli.dry_run),
+        },
+        Commands::Cloud { action } => match action {
+            CloudAction::Status => commands::cloud::status(),
+            CloudAction::Backup => commands::cloud::backup(cli.dry_run),
+            CloudAction::Restore => commands::cloud::restore(cli.dry_run),
+            CloudAction::Clear => commands::cloud::clear(cli.dry_run),
         },
     }
 }

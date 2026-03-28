@@ -113,8 +113,7 @@ pub fn deploy_mods(game_dir: &Path, branch: &Branch) -> Result<DeployResult> {
     if let Some(sml_zip) = find_mod_zip(&cache_dir, "SML") {
         let sml_dest = mods_dir.join("SML");
         fs::create_dir_all(&sml_dest)?;
-        extract_zip(&sml_zip, &sml_dest)
-            .with_context(|| "Failed to deploy SML")?;
+        extract_zip(&sml_zip, &sml_dest).with_context(|| "Failed to deploy SML")?;
         result.sml_deployed = true;
     }
 

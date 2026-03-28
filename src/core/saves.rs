@@ -14,11 +14,17 @@ fn ficswitch_data_dir() -> Result<PathBuf> {
 }
 
 fn profile_saves_dir(profile_name: &str) -> Result<PathBuf> {
-    Ok(ficswitch_data_dir()?.join("profiles").join(profile_name).join("saves"))
+    Ok(ficswitch_data_dir()?
+        .join("profiles")
+        .join(profile_name)
+        .join("saves"))
 }
 
 fn profile_blueprints_dir(profile_name: &str) -> Result<PathBuf> {
-    Ok(ficswitch_data_dir()?.join("profiles").join(profile_name).join("blueprints"))
+    Ok(ficswitch_data_dir()?
+        .join("profiles")
+        .join(profile_name)
+        .join("blueprints"))
 }
 
 fn copy_dir(src: &Path, dest: &Path) -> Result<()> {
@@ -58,7 +64,6 @@ pub fn sync_saves_out(game_save_dir: &Path, profile_name: &str) -> Result<usize>
 
     Ok(count)
 }
-
 
 const SATISFACTORY_APP_ID: &str = "526870";
 
@@ -178,7 +183,6 @@ pub fn list_saves(save_dir: &Path) -> Result<Vec<PathBuf>> {
     saves.sort();
     Ok(saves)
 }
-
 
 #[cfg(test)]
 mod tests {

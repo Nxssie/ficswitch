@@ -30,8 +30,18 @@ pub fn list() -> Result<()> {
     Ok(())
 }
 
-pub fn link(profile_name: &str, branch_name: &str) -> Result<()> {
+pub fn link(profile_name: &str, branch_name: &str, dry_run: bool) -> Result<()> {
     let branch = steam::Branch::from_str(branch_name)?;
+
+    if dry_run {
+        println!(
+            "{} [DRY RUN] Would link profile '{}' to {} branch",
+            "ℹ".blue(),
+            profile_name.cyan(),
+            branch.to_string().bold()
+        );
+        return Ok(());
+    }
 
     match profiles::link_profile(profile_name, &branch) {
         Ok(()) => {
@@ -65,10 +75,7 @@ pub fn show() -> Result<()> {
     let branch_profiles = profiles::read_branch_profiles()?;
 
     if branch_profiles.mappings.is_empty() {
-        println!(
-            "{} No profile-branch mappings configured.",
-            "ℹ".blue()
-        );
+        println!("{} No profile-branch mappings configured.", "ℹ".blue());
         println!(
             "Use {} to link a profile to a branch.",
             "ficswitch profile link <name> <branch>".dimmed()

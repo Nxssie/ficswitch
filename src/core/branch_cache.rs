@@ -97,8 +97,12 @@ pub fn list_caches() -> Result<Vec<CacheInfo>> {
     for entry in fs::read_dir(&root)? {
         let entry = entry?;
         let name = entry.file_name().to_string_lossy().to_string();
-        let Ok(branch) = Branch::from_str(&name) else { continue };
-        if !entry.path().join(SENTINEL).exists() { continue }
+        let Ok(branch) = Branch::from_str(&name) else {
+            continue;
+        };
+        if !entry.path().join(SENTINEL).exists() {
+            continue;
+        }
 
         let file_count = count_files(&entry.path())?;
         infos.push(CacheInfo { branch, file_count });

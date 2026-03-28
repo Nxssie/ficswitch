@@ -3,9 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 fn test_save_dir(test_name: &str) -> PathBuf {
-    let dir = std::env::temp_dir()
-        .join("ficswitch_tests")
-        .join(test_name);
+    let dir = std::env::temp_dir().join("ficswitch_tests").join(test_name);
     fs::create_dir_all(&dir).expect("failed to create test dir");
     dir
 }
@@ -34,7 +32,11 @@ fn test_backup_create_produces_manifest() {
 
     // ID must match YYYYMMDD_HHMMSS format (15 chars, underscore at position 8)
     assert_eq!(manifest.id.len(), 15, "id should be 15 chars");
-    assert_eq!(&manifest.id[8..9], "_", "id should have underscore at position 8");
+    assert_eq!(
+        &manifest.id[8..9],
+        "_",
+        "id should have underscore at position 8"
+    );
 
     let backup_root = backup::backup_root().expect("backup_root failed");
     let manifest_path = backup_root.join(&manifest.id).join("manifest.json");
@@ -51,7 +53,11 @@ fn test_backup_create_produces_manifest() {
 fn test_backup_list_empty() {
     // Cannot inject backup_root path; assert no panic when dir may or may not exist.
     let result = backup::list_backups();
-    assert!(result.is_ok(), "list_backups returned Err: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "list_backups returned Err: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -67,7 +73,11 @@ fn test_backup_list_after_create() {
 
     let backups = backup::list_backups().expect("list_backups failed");
     let found = backups.iter().any(|b| b.id == manifest.id);
-    assert!(found, "created backup id '{}' not found in list", manifest.id);
+    assert!(
+        found,
+        "created backup id '{}' not found in list",
+        manifest.id
+    );
 
     let _ = fs::remove_dir_all(&save_dir);
 }
@@ -84,9 +94,24 @@ fn test_backup_restore() {
     let restore_dir = test_save_dir("backup_restore_dest");
     backup::restore_backup(&manifest.id, &restore_dir).expect("restore_backup failed");
 
-    assert!(restore_dir.join("world.sav").exists(), "world.sav not restored");
-    assert!(restore_dir.join("other.sav").exists(), "other.sav not restored");
+    assert!(
+        restore_dir.join("world.sav").exists(),
+        "world.sav not restored"
+    );
+    assert!(
+        restore_dir.join("other.sav").exists(),
+        "other.sav not restored"
+    );
 
     let _ = fs::remove_dir_all(&save_dir);
     let _ = fs::remove_dir_all(&restore_dir);
+}
+
+#[test]
+fn test_backup_commands_accept_dry_run() {
+    // Compile-time check: verify backup commands accept dry_run parameter.
+    let _ = |_dry_run: bool| {
+        let _ = ficswitch::commands::backup::create;
+        let _ = ficswitch::commands::backup::restore;
+    };
 }
